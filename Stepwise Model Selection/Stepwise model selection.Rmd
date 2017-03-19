@@ -1,0 +1,191 @@
+
+### Stepwise Model Selection
+##### Jocelyn Li
+##### Feb 2017
+***
+
+#### **What is stepwise regression? **
+**Stepwise regression** is a semi-automated process of building a model by successively adding or removing variables based solely on the t-statistics of their estimated coefficients. 
+
+
+#### **How it works?**
+* Suppose you have some set of potential independent variables from which you wish to try to extract the best subset for use in your forecasting model. (These are the variables you will select on the initial input screen.) The stepwise option lets you either begin with no variables in the model and proceed **forward** (adding one variable at a time), or start with all potential variables in the model and proceed **backward** (removing one variable at a time). 
+
+* At each step, the program performs the following calculations: for each variable currently in the model, it computes the t-statistic for its estimated coefficient, squares it, and reports this as its "F-to-remove" statistic; for each variable not in the model, it computes the t-statistic that its coefficient would have if it were the next variable added, squares it, and reports this as its "F-to-enter" statistic. At the next step, the program automatically enters the variable with the highest F-to-enter statistic, or removes the variable with the lowest F-to-remove statistic, in accordance with certain control parameters you have specified. So the key relation to remember is: F = t-squared
+
+***
+
+* Database : http://www.umass.edu/statdata/statdata/data/lowbwt.txt
+* Database Description:
+* Description
+
+The goal of this study was to identify risk factors associated with
+giving birth to a low birth weight baby (weighing less than 2500 grams).
+Data were collected on 189 women, 59 of which had low birth weight babies
+and 130 of which had normal birth weight babies.  Four variables which were
+thought to be of importance were age, weight of the subject at her last
+menstrual period, race, and the number of physician visits during the first
+trimester of pregnancy.
+variables: 
+
+1. **ID**:  Identification Code
+2. **LOW**: Low Birth Weight (0 = Birth Weight >= 2500g, 1 = Birth Weight < 2500g)
+3. **AGE**: Age of the Mother in Years
+4. **LWT**: Weight in Pounds at the Last Menstrual Period
+5. **RACE**: Race (1 = White, 2 = Black, 3 = Other)
+6. **SMOKE**: Smoking Status During Pregnancy (1 = Yes, 0 = No)
+7. **PTL**: History of Premature Labor (0 = None  1 = One, etc.)
+8. **HT**: History of Hypertension (1 = Yes, 0 = No)
+9. **UI**:  Presence of Uterine Irritability (1 = Yes, 0 = No) 
+10. **FTV**:  Number of Physician Visits During the First Trimester (0 = None, 1 = One, 2 = Two, etc.)
+11. **BWT**:  Birth Weight in Grams
+
+***
+
+#### load file
+```{r, warning = FALSE, error=FALSE, message=FALSE}
+getwd()
+library(readxl)
+lowbwt<-read_excel('lowbwt.xls') 
+head(lowbwt)
+```
+***
+
+#### Logisitc regression
+
+* Manual likelihood-ratio-test-based backward selection
+* Manual likelihood-ratio-test-based forward selection
+* Automated likelihood-ratio-test-based backward selection
+* Automated likelihood-ratio-test-based forward selection
+
+***
+
+```{r, warning = FALSE, error=FALSE, message=FALSE}
+lowbwt$ftv.cat <- cut(lowbwt$FTV, breaks = c(-Inf, 0, 2, Inf), labels = c("None","Normal","Manyhe"))
+lowbwt$PTL <- factor(lowbwt$PTL >= 1, levels = c(F,T), labels = c("0","1+"))
+
+glm.full <- glm(LOW ~ AGE + LWT + RACE + SMOKE + PTL + HT + UI + ftv.cat, data = lowbwt, family = binomial)
+glm.null <- glm(LOW ~ 1, data = lowbwt, family = binomial)
+
+drop1(glm.full, test = "LRT")
+
+summary(glm.full)
+
+head(lowbwt)
+```
+
+
+* Then we use drop function to drop variables.
+* While using the drop1 command in R for model building, it is said the variable with the lowest AIC value must be dropped. 
+* AIC(Akaike information criterion). AIC is a measure of the relative quality of statistical models for a given set of data. Given a collection of models for the data, AIC estimates the quality of each model, relative to each of the other models. Hence, AIC provides a means for model selection. smaller AIC is better. 
+* LTR: Likelihoo-Ratio Test
+
+***
+
+#### Manual likelihood-ratio-test-based backward selection
+
+```{r, warning = FALSE, error=FALSE, message=FALSE}
+drop1(glm.full, test='LRT')
+```
+we can see ftv.cat is least significant, then drop ftv.cat
+
+
+```{r, warning = FALSE, error=FALSE, message=FALSE}
+drop1(update(glm.full,~.-ftv.cat), test = "LRT")
+```
+Then we can see age is least significant, then we drop ftv.cat and age.
+
+```{r, warning = FALSE, error=FALSE, message=FALSE}
+drop1(update(glm.full,~.-ftv.cat -AGE), test = "LRT")
+```
+UI is least significant, then we drop UI. 
+
+
+```{r, warning = FALSE, error=FALSE, message=FALSE}
+drop1(update(glm.full,~.-ftv.cat -AGE -UI), test = "LRT")
+```
+
+Result
+```{r, warning = FALSE, error=FALSE, message=FALSE}
+summary(update(glm.full,~.-ftv.cat -AGE -UI))
+```
+
+***
+
+####  Manual likelihood-ratio-test-based forward selection
+
+```{r, warning = FALSE, error=FALSE, message=FALSE}
+add1(glm.null, scope = ~ LOW ~ AGE + LWT + RACE + SMOKE + PTL + HT + UI + ftv.cat, data = lowbwt, test = "LRT")
+```
+
+preterm is the most significant variable
+
+```{r, warning = FALSE, error=FALSE, message=FALSE}
+add1(update (glm.null, ~ . + PTL), scope = ~ LOW ~ AGE + LWT + RACE + SMOKE + PTL + HT + UI + ftv.cat, data = lowbwt, test = "LRT")
+```
+
+Then, age is the next most significant variable.
+
+```{r, warning = FALSE, error=FALSE, message=FALSE}
+add1(update (glm.null, ~ . + PTL +AGE), scope = ~ LOW ~ AGE + LWT + RACE + SMOKE + PTL + HT + UI + ftv.cat, data = lowbwt, test = "LRT")
+
+```
+
+Now HT is the most significant.
+
+```{r, warning = FALSE, error=FALSE, message=FALSE}
+add1(update (glm.null, ~ . + PTL +AGE +HT), scope = ~ LOW ~ AGE + LWT + RACE + SMOKE + PTL + HT + UI + ftv.cat, data = lowbwt, test = "LRT")
+```
+
+Then LWT is the most significant.
+
+```{r, warning = FALSE, error=FALSE, message=FALSE}
+add1(update (glm.null, ~ . +PTL +AGE +HT +LWT), scope = ~ LOW ~ AGE + LWT + RACE + SMOKE + PTL + HT + UI + ftv.cat, data = lowbwt, test = "LRT")
+
+```
+
+summary
+
+```{r, warning = FALSE, error=FALSE, message=FALSE}
+summary( update (glm.null, ~ . +PTL +AGE +HT +LWT) )
+```
+
+***
+
+####  Automated likelihood-ratio-test-based backward selection
+
+**fastbw** function: Fast Backward Variable Selection. 
+
+```{r, warning = FALSE, error=FALSE, message=FALSE}
+library(rms)
+lrm.full <- rms::lrm (LOW ~ AGE + LWT + RACE + SMOKE + PTL + HT + UI + ftv.cat, data = lowbwt)
+fastbw(lrm.full, rule = "p", sls = 0.1)  # Significance level for staying in a model if rule="p". Default is .05.
+```
+
+* AIC-based backward selection
+
+```{r, warning = FALSE, error=FALSE, message=FALSE}
+model.aic.backward <- step(glm.full, direction = "backward", trace = 1)
+
+```
+***
+
+```{r, warning = FALSE, error=FALSE, message=FALSE}
+summary(model.aic.backward)
+
+```
+* AIC-based forward selection
+
+```{r, warning = FALSE, error=FALSE, message=FALSE}
+model.aic.forward <- step(glm.null, direction = "forward", trace = 1, scope = ~ LOW ~ AGE + LWT + RACE + SMOKE + PTL + HT + UI + ftv.cat)
+```
+
+```{r, warning = FALSE, error=FALSE, message=FALSE}
+summary(model.aic.forward)
+```
+
+
+#### References 
+
+1. https://people.duke.edu/~rnau/regstep.htm
+2. http://rstudio-pubs-static.s3.amazonaws.com/2899_a9129debf6bd47d2a0501de9c0dc583d.html
